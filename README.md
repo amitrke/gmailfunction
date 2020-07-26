@@ -1,5 +1,7 @@
-# Empower Your Gmail Inbox with Google Cloud Functions CodeLab
+# Empower Your Gmail Inbox with Google Cloud Functions
 
-Note: This is not an officially supported Google product.
+Deploy function
 
-Write something.
+```
+gcloud beta functions deploy watchGmailMessages --runtime=nodejs8 --env-vars-file=env_vars.yaml
+```

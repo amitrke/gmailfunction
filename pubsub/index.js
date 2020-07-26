@@ -59,15 +59,30 @@ const getMostRecentMessageWithTag = async (email, historyId) => {
 // Extract message ID, sender, attachment filename and attachment ID
 // from the message.
 const extractInfoFromMessage = (message) => {
+  
   const messageId = message.data.id;
   let from;
   let filename;
   let attachmentId;
+  let subject;
+  let to;
+  let date;
+  const snippet = message.data.snippet;
+  const threadId = message.data.threadId;
 
   const headers = message.data.payload.headers;
   for (var i in headers) {
     if (headers[i].name === 'From') {
       from = headers[i].value;
+    }
+    if (headers[i].name === 'Subject') {
+      subject = headers[i].value;
+    }
+    if (headers[i].name === 'To') {
+      to = headers[i].value;
+    }
+    if (headers[i].name === 'Date') {
+      date = headers[i].value;
     }
   }
 
@@ -80,10 +95,15 @@ const extractInfoFromMessage = (message) => {
   }
 
   return {
-    messageId: messageId,
-    from: from,
+    messageId,
+    from,
     attachmentFilename: filename,
-    attachmentId: attachmentId
+    attachmentId,
+    subject,
+    to,
+    date,
+    snippet,
+    threadId
   };
 };
 
@@ -128,6 +148,21 @@ const updateReferenceSheet = async (from, filename, topLabels) => {
   });
 };
 
+const updateReferenceSheet2 = async (date, id, threadId, from, to, subject, snippet) => {
+  await googleSheets.spreadsheets.values.append({
+    spreadsheetId: SHEET,
+    range: 'Sheet2!A1:G1',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      range: 'Sheet2!A1:G1',
+      majorDimension: 'ROWS',
+      values: [
+        [date, id, threadId, from, to, subject, snippet]
+      ]
+    }
+  });
+};
+
 exports.watchGmailMessages = async (event) => {
   // Decode the incoming Gmail push notification.
   const data = Buffer.from(event.data, 'base64').toString();
@@ -148,6 +183,12 @@ exports.watchGmailMessages = async (event) => {
   const message = await getMostRecentMessageWithTag(email, historyId);
   if (message) {
     const messageInfo = extractInfoFromMessage(message);
+    
+    console.log(`messageInfo=${JSON.stringify(messageInfo)}`);
+
+    await updateReferenceSheet2(messageInfo.date, messageInfo.messageId, messageInfo.threadId, 
+      messageInfo.from, messageInfo.to, messageInfo.subject, messageInfo.snippet);
+
     if (messageInfo.attachmentId && messageInfo.attachmentFilename) {
       const attachment = await extractAttachmentFromMessage(email, messageInfo.messageId, messageInfo.attachmentId);
       const topLabels = await analyzeAttachment(attachment.data.data, messageInfo.attachmentFilename);
